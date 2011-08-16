@@ -1,0 +1,40 @@
+=pod
+
+=head1 NAME
+
+Vinyl - An implementation of the Datamapper pattern (Moose + DBIC) 
+
+=head1 VERSION
+
+version 0.01
+
+=head1 SYNOPSIS
+
+    # bind your model classes with your data store
+    my $model = Vinyl::Model->new( namespace=>'Model' );
+    my $store = Vinyl::Store::DBIC->connect('dbi:SQLite::memory:');
+    Vinyl::Session->static( model=>$model, store=>$store );
+
+    # enjoy
+    my $obj = Model::Artist->new( name=>'Lou' ); # in ram
+    $obj->save; # save to db
+
+=head1 DESCRIPTION
+
+This is a preview release of Vinyl. Don't use this module yet.
+
+This library implements the Datamapper and Repository patterns. 
+The idea is to separate your domain model (Moose classes) 
+from your data model (SQL calls, ORMs like DBIx::Class or RoseDB, 
+NoSQL database or KiokuDB). 
+
+The advantage of using such pattern is that your model object 
+instances do not have to know about the underlying implementation. 
+
+The separation is archieved through delegation, which means
+your objects will have either a C<rs> or C<row> attribute 
+or both. 
+
+The API is heavily influenced by DBIC's own, with nuances
+from Rubyishy libraries such as ActiveRecord and DataMapper. 
+
