@@ -5,12 +5,13 @@ use MooseX::Types::DBIx::Class qw/Row ResultSet/;
 
 class_has 'rs' => (
     is=>'rw', isa=>ResultSet,
-    handles=>[qw/search find/]
+    #handles=>[qw/search find/]
+    handles  => [ qw/all find first reset next search delete count/ ],
 );
 
 has 'row' => (
     is=>'rw', isa=>Row,
-    handles=>[qw/insert create delete/]
+    handles=>[qw/insert create get_from_storage/]
 );
 
 around 'search' => sub {
@@ -20,22 +21,51 @@ around 'search' => sub {
     Vinyl::Set::DBICe->new( class_name=>$self->class_name, rs=>$rs );
 };
 
-around 'find' => sub {
+around [qw(find)] => sub {
     my $orig = shift;
     my $self = shift;
     my $row = $self->$orig( @_ );
-    $row ? bless( { %$row }, $self->class_name ) : $row;
+    my $obj = $row ? bless( { $row->get_columns } => $self->class_name ) : $row;
+    return undef unless ref $obj;
+    $obj->row( $row );
+    $obj->load_relationships;
+    $obj;
 };
 
-sub class_name {
+around get_from_storage => sub {
+    my $orig = shift;
     my $self = shift;
-    ref $self || $self;
-}
+    my $row = $self->$orig( @_ );
+    return unless $row;
+    $self->load_with_accessors( $row->get_columns );
+};
+
+with 'Vinyl::Role::Record';
+
 sub save {
     my $self = shift;
-    #my $row = $self->rs->new( $self->_db_serialize_columns );
-    #$row->insert;
-    $self->rs->update_or_create( $self->_db_serialize_columns, @_ );
+    if( my $row = $self->row ) {   # obj is live
+        my $cols = $self->_db_serialize_columns;
+        while( my ($k,$v) = each %$cols ) {
+            $row->set_column( $k, $v );
+        }
+        $self->store_relationships;
+        $row->update;
+    } else {  # obj has not been initialized or is new
+        my $row = $self->rs->update_or_create( $self->_db_serialize_columns, @_ );
+        $self->row( $row );
+        $self->store_relationships;
+        return $row;
+    }
+}
+
+sub find_new {
+    my $self = shift;
+    my $class = $self->class_name;
+    my $row = $self->rs->find( @_ );
+    my $obj = $class->new( $row->get_columns );
+    $obj->row( $row );
+    return $obj;
 }
 
 sub _db_serialize_columns {

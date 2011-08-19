@@ -2,10 +2,12 @@ package Vinyl;
 use Moose ();
 use Moose::Exporter;
 
+require Vinyl::Model;
+require Vinyl::Session;
 require Vinyl::Meta;
 
 Moose::Exporter->setup_import_methods(
-    with_meta => [qw(has_column resource)],
+    with_meta => [qw(has_column has_one has_many resource)],
     also      => 'Moose',
 );
 
@@ -38,7 +40,69 @@ sub has_column {
     $meta->add_attribute( $name, %options, );
 }
 
-sub has_many { ... }
+sub has_one {
+    my $meta = shift;
+    my $name = shift;
+    my %options;
+    if ( @_ > 0 && @_ % 2 ) {
+        $options{isa} = shift;
+        $options{is}  = 'rw';
+        if( @_ > 1 ) {  # allow: has_one 'att' => 'Str', required=>1;
+            %options = ( %options, @_ );
+        }
+    }
+    else {
+        %options = @_;
+        $options{isa} ||= 'Any';
+        $options{is}  ||= 'rw';
+    }
+    push @{ $options{traits} }, 'Vinyl::Join';
+
+    #TODO make sure the object is a Vinyl::Record 
+    #   otherwise it should not be a join but a serialized row instead
+
+    $meta->add_attribute( $name, %options, );
+}
+
+sub belongs_to {
+    my $meta = shift;
+    my $name = shift;
+    my %options;
+    if ( @_ > 0 && @_ % 2 ) {
+        $options{isa} = shift;
+        $options{is}  = 'rw';
+        if( @_ > 1 ) {  # allow: has_one 'att' => 'Str', required=>1;
+            %options = ( %options, @_ );
+        }
+    }
+    else {
+        %options = @_;
+        $options{isa} ||= 'Any';
+        $options{is}  ||= 'rw';
+    }
+    push @{ $options{traits} }, 'Vinyl::Join', 'Vinyl::Column';
+
+    $meta->add_attribute( $name, %options, );
+}
+
+sub has_many {
+    my $meta = shift;
+    my $name = shift;
+    my %options;
+    if   ( scalar @_ == 1 ) { $options{isa} = shift; }
+    else                    { %options      = @_; }
+    
+    my $isa_original = $options{isa};
+    my $reciprocal = delete $options{reciprocal};
+    $options{isa} = 'Vinyl::Join[' . $options{isa} . ']';
+    $options{default} ||=
+      sub {
+          use Vinyl::Join;
+          Vinyl::Join->new( with_class => "$isa_original", owner => shift, reciprocal => $reciprocal  );
+        };
+    $options{is} ||= 'ro';
+    $meta->add_attribute( $name, %options, );
+}
 
 package Vinyl::Meta::Attribute::Trait::Vinyl::Column; {
     use strict;
@@ -49,6 +113,15 @@ package Vinyl::Meta::Attribute::Trait::Vinyl::Column; {
 
 package Moose::Meta::Attribute::Custom::Trait::Vinyl::Column; {
     sub register_implementation {'Vinyl::Meta::Attribute::Trait::Vinyl::Column'}
+}
+
+package Vinyl::Meta::Attribute::Trait::Vinyl::Join; {
+    use strict;
+    use Moose::Role;
+}
+
+package Moose::Meta::Attribute::Custom::Trait::Vinyl::Join; {
+    sub register_implementation {'Vinyl::Meta::Attribute::Trait::Vinyl::Join'}
 }
 
 =pod

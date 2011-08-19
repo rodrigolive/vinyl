@@ -4,7 +4,7 @@ use warnings;
 
 use base 'DBIx::Class::Core';
 __PACKAGE__->load_components("InflateColumn::DateTime");
-__PACKAGE__->table("bali_user");
+__PACKAGE__->table("user");
 __PACKAGE__->add_columns(
   "id",
   {
@@ -12,7 +12,7 @@ __PACKAGE__->add_columns(
     is_auto_increment => 1,
     is_nullable => 0,
     original => { data_type => "number" },
-    #sequence => "bali_user_seq",
+    #sequence => "user_seq",
     size => 126,
   },
   "username",
@@ -30,9 +30,11 @@ __PACKAGE__->add_columns(
 );
 __PACKAGE__->set_primary_key("id");
 
+__PACKAGE__->might_have( 'project_owned' => 'Schema::Result::Project', 'id_leader' );
+
 #__PACKAGE__->has_many(
 #  "roles",
-#  "Baseliner::Schema::Baseliner::Result::BaliRoleuser",
+#  "Baseliner::Schema::Baseliner::Result::Roleuser",
 #  { 'foreign.username' => "self.username" },
 #);
 
